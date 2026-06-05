@@ -56,7 +56,11 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
     int height = static_cast<int>(jHeight);
     if (seed == -1) seed = 42; // fallback; caller should randomise before passing
 
-    MNNForwardType gpuFwdType = (jGpuBackend == 1) ? MNN_FORWARD_VULKAN : MNN_FORWARD_OPENCL;
+    // gpuBackend: 0=OpenCL, 1=Vulkan, 2=CPU
+    MNNForwardType gpuFwdType;
+    if      (jGpuBackend == 1) gpuFwdType = MNN_FORWARD_VULKAN;
+    else if (jGpuBackend == 2) gpuFwdType = MNN_FORWARD_CPU;
+    else                       gpuFwdType = MNN_FORWARD_OPENCL;
     bool teOnCPU  = (jTextEncoderOnCPU  == JNI_TRUE);
     bool vaeOnCPU = (jVaeOnCPU == JNI_TRUE);
 

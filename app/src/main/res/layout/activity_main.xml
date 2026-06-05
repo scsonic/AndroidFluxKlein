@@ -247,19 +247,18 @@
                     android:letterSpacing="0.08"
                     android:layout_marginBottom="10dp" />
 
-                <!-- GPU backend row (OpenCL / Vulkan) -->
+                <!-- Transformer backend row (CPU / Vulkan) — TE and VAE always CPU -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="8dp">
+                    android:gravity="center_vertical">
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/backend_gpu_label"
+                        android:text="@string/backend_transformer_label"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="13sp" />
 
@@ -269,21 +268,21 @@
                         android:layout_height="wrap_content"
                         app:singleSelection="true"
                         app:selectionRequired="true"
-                        app:checkedButton="@id/btnGpuOpenCL">
+                        app:checkedButton="@id/btnTransformerCPU">
 
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnGpuOpenCL"
+                            android:id="@+id/btnTransformerCPU"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/backend_opencl"
+                            android:text="@string/backend_cpu"
                             android:textSize="11sp"
                             android:minWidth="0dp"
                             android:paddingStart="12dp"
                             android:paddingEnd="12dp" />
 
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnGpuVulkan"
+                            android:id="@+id/btnTransformerVulkan"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -293,131 +292,6 @@
                             android:paddingStart="12dp"
                             android:paddingEnd="12dp" />
                     </com.google.android.material.button.MaterialButtonToggleGroup>
-                </LinearLayout>
-
-                <!-- Text Encoder backend row (CPU / GPU) -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="8dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/backend_te_label"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="13sp" />
-
-                    <com.google.android.material.button.MaterialButtonToggleGroup
-                        android:id="@+id/toggleTeBackend"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:singleSelection="true"
-                        app:selectionRequired="true"
-                        app:checkedButton="@id/btnTeCPU">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnTeCPU"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/backend_cpu"
-                            android:textSize="11sp"
-                            android:minWidth="0dp"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnTeGPU"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/backend_gpu"
-                            android:textSize="11sp"
-                            android:minWidth="0dp"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp" />
-                    </com.google.android.material.button.MaterialButtonToggleGroup>
-                </LinearLayout>
-
-                <!-- VAE backend row (CPU / GPU) -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="10dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/backend_vae_label"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="13sp" />
-
-                    <com.google.android.material.button.MaterialButtonToggleGroup
-                        android:id="@+id/toggleVaeBackend"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:singleSelection="true"
-                        app:selectionRequired="true"
-                        app:checkedButton="@id/btnVaeCPU">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnVaeCPU"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/backend_cpu"
-                            android:textSize="11sp"
-                            android:minWidth="0dp"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnVaeGPU"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/backend_gpu"
-                            android:textSize="11sp"
-                            android:minWidth="0dp"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp" />
-                    </com.google.android.material.button.MaterialButtonToggleGroup>
-                </LinearLayout>
-
-                <!-- Benchmark row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/tvBenchmarkStatus"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textSize="10sp"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:fontFamily="monospace"
-                        android:paddingEnd="8dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnBenchmark"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/btn_benchmark"
-                        android:textSize="12sp"
-                        android:minWidth="0dp"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="12dp" />
                 </LinearLayout>
 
             </LinearLayout>
