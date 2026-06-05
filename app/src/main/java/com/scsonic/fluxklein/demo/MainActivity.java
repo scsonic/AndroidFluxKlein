@@ -778,45 +778,163 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================================
-    // Benchmark
+    // Benchmark — each run saved immediately; survives crash / app restart
     // =========================================================================
+
+    private static final String PREFS_BENCH        = "bench_prefs";
+    private static final String KEY_BENCH_DONE     = "done";       // 0-4 runs completed
+    private static final String KEY_BENCH_BEST_GPU = "best_gpu";   // 0=OpenCL 1=Vulkan
+    private static final String KEY_BENCH_R1       = "r1";         // "te,unet,vae" or ""
+    private static final String KEY_BENCH_R2       = "r2";
+    private static final String KEY_BENCH_R3       = "r3";
+    private static final String KEY_BENCH_R4       = "r4";
 
     private void startBenchmark() {
         if (isGenerating || isBenchmarking) return;
+
+        // Pre-flight: model directory must exist and be accessible
+        File modelDir = new File(DEFAULT_MODEL_PATH);
+        if (!modelDir.exists() || !modelDir.isDirectory()) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Model Not Found")
+                .setMessage("Cannot access:\n" + DEFAULT_MODEL_PATH
+                    + "\n\nCheck storage permission is granted and model is present:\n"
+                    + "  adb push <model_dir> /sdcard/mnn_flux/model")
+                .setPositiveButton("OK", null)
+                .show();
+            return;
+        }
+
+        SharedPreferences bp = getSharedPreferences(PREFS_BENCH, MODE_PRIVATE);
+        int doneRuns = bp.getInt(KEY_BENCH_DONE, 0);
+
+        if (doneRuns == 4) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Benchmark Complete")
+                .setMessage("All 4 runs are saved.\nShow previous results or re-run?")
+                .setPositiveButton("Show Results", (d, w) -> showSavedBenchmarkResults(bp))
+                .setNegativeButton("Re-run", (d, w) -> { clearBenchPrefs(); executeBenchmark(0); })
+                .show();
+            return;
+        }
+
+        if (doneRuns > 0) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Resume Benchmark?")
+                .setMessage(doneRuns + "/4 runs completed (possibly interrupted by crash).\n\n"
+                    + "Resume from run " + (doneRuns + 1) + "?")
+                .setPositiveButton("Resume",  (d, w) -> executeBenchmark(doneRuns))
+                .setNegativeButton("Restart", (d, w) -> { clearBenchPrefs(); executeBenchmark(0); })
+                .show();
+            return;
+        }
+
+        executeBenchmark(0);
+    }
+
+    private void executeBenchmark(int startFromRun) {
         isBenchmarking = true;
         btnBenchmark.setEnabled(false);
         btnGenerate.setEnabled(false);
-        tvBenchmarkStatus.setText("Starting…");
+        tvBenchmarkStatus.setText("Preparing…");
+
+        SharedPreferences bp = getSharedPreferences(PREFS_BENCH, MODE_PRIVATE);
 
         executor.submit(() -> {
-            // Run 1: OpenCL baseline — captures te_cpu, unet_opencl, vae_cpu
-            long[] r1 = runOneBenchmarkSync(0, true,  true,  "1/4  OpenCL  TE=CPU  VAE=CPU");
-            if (r1 == null) {
-                mainHandler.post(() -> {
-                    isBenchmarking = false;
-                    btnBenchmark.setEnabled(true);
-                    btnGenerate.setEnabled(true);
-                    tvBenchmarkStatus.setText("Failed — model missing?");
-                });
-                return;
+            long[] r1 = null, r2 = null, r3 = null, r4 = null;
+            int bestGpu = 0;
+
+            // Restore already-completed runs from disk
+            if (startFromRun >= 1) r1 = loadBenchRun(bp, KEY_BENCH_R1);
+            if (startFromRun >= 2) {
+                r2 = loadBenchRun(bp, KEY_BENCH_R2);
+                bestGpu = bp.getInt(KEY_BENCH_BEST_GPU, 0);
             }
-            // Run 2: Vulkan baseline — captures unet_vulkan
-            long[] r2 = runOneBenchmarkSync(1, true,  true,  "2/4  Vulkan  TE=CPU  VAE=CPU");
-            // Pick best GPU type from UNet comparison
-            int bestGpu = (r2 != null && r2[1] < r1[1]) ? 1 : 0;
+            if (startFromRun >= 3) r3 = loadBenchRun(bp, KEY_BENCH_R3);
+            if (startFromRun >= 4) r4 = loadBenchRun(bp, KEY_BENCH_R4);
+
+            // Run 1: OpenCL baseline — get te_cpu, unet_opencl, vae_cpu
+            if (startFromRun < 1) {
+                r1 = runOneBenchmarkSync(0, true, true, "1/4  OpenCL  TE=CPU  VAE=CPU");
+                if (r1 == null) { benchFailed("Run 1 failed — check model path and OpenCL support"); return; }
+                saveBenchRun(bp, KEY_BENCH_R1, r1);
+                bp.edit().putInt(KEY_BENCH_DONE, 1).apply();
+            }
+
+            // Run 2: Vulkan baseline — null is OK (device may not support Vulkan)
+            if (startFromRun < 2) {
+                r2 = runOneBenchmarkSync(1, true, true, "2/4  Vulkan  TE=CPU  VAE=CPU");
+                bestGpu = (r2 != null && r2[1] < r1[1]) ? 1 : 0;
+                saveBenchRun(bp, KEY_BENCH_R2, r2);
+                bp.edit().putInt(KEY_BENCH_DONE, 2).putInt(KEY_BENCH_BEST_GPU, bestGpu).apply();
+            }
+
             // Run 3: TE on best GPU
-            long[] r3 = runOneBenchmarkSync(bestGpu, false, true,  "3/4  TE=GPU test");
+            if (startFromRun < 3) {
+                String gn = bestGpu == 1 ? "Vulkan" : "OpenCL";
+                r3 = runOneBenchmarkSync(bestGpu, false, true, "3/4  TE=GPU (" + gn + ")");
+                saveBenchRun(bp, KEY_BENCH_R3, r3);
+                bp.edit().putInt(KEY_BENCH_DONE, 3).apply();
+            }
+
             // Run 4: VAE on best GPU
-            long[] r4 = runOneBenchmarkSync(bestGpu, true,  false, "4/4  VAE=GPU test");
+            if (startFromRun < 4) {
+                String gn = bestGpu == 1 ? "Vulkan" : "OpenCL";
+                r4 = runOneBenchmarkSync(bestGpu, true, false, "4/4  VAE=GPU (" + gn + ")");
+                saveBenchRun(bp, KEY_BENCH_R4, r4);
+                bp.edit().putInt(KEY_BENCH_DONE, 4).apply();
+            }
 
             final long[] fr1=r1, fr2=r2, fr3=r3, fr4=r4;
-            final int    fg = bestGpu;
+            final int    fg  = bestGpu;
             mainHandler.post(() -> {
                 isBenchmarking = false;
                 btnBenchmark.setEnabled(true);
                 btnGenerate.setEnabled(true);
                 processBenchmarkResults(fr1, fr2, fr3, fr4, fg);
             });
+        });
+    }
+
+    private void showSavedBenchmarkResults(SharedPreferences bp) {
+        long[] r1 = loadBenchRun(bp, KEY_BENCH_R1);
+        long[] r2 = loadBenchRun(bp, KEY_BENCH_R2);
+        long[] r3 = loadBenchRun(bp, KEY_BENCH_R3);
+        long[] r4 = loadBenchRun(bp, KEY_BENCH_R4);
+        int bestGpu = bp.getInt(KEY_BENCH_BEST_GPU, 0);
+        if (r1 != null) processBenchmarkResults(r1, r2, r3, r4, bestGpu);
+        else tvBenchmarkStatus.setText("No saved results");
+    }
+
+    private void saveBenchRun(SharedPreferences bp, String key, long[] vals) {
+        String v = (vals != null) ? vals[0] + "," + vals[1] + "," + vals[2] : "";
+        bp.edit().putString(key, v).apply();
+    }
+
+    private long[] loadBenchRun(SharedPreferences bp, String key) {
+        String s = bp.getString(key, "");
+        if (s == null || s.isEmpty()) return null;
+        try {
+            String[] parts = s.split(",");
+            return new long[]{Long.parseLong(parts[0]), Long.parseLong(parts[1]), Long.parseLong(parts[2])};
+        } catch (Exception e) { return null; }
+    }
+
+    private void clearBenchPrefs() {
+        getSharedPreferences(PREFS_BENCH, MODE_PRIVATE).edit().clear().apply();
+    }
+
+    private void benchFailed(String reason) {
+        mainHandler.post(() -> {
+            isBenchmarking = false;
+            btnBenchmark.setEnabled(true);
+            btnGenerate.setEnabled(true);
+            tvBenchmarkStatus.setText("Failed");
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Benchmark Failed")
+                .setMessage(reason)
+                .setPositiveButton("OK", null)
+                .show();
         });
     }
 
@@ -838,10 +956,10 @@ public class MainActivity extends AppCompatActivity {
         try {
             boolean ok = FluxKlein.generate(cfg, outPath, progress -> {
                 long now = System.currentTimeMillis();
-                if (progress == 0)                      t[0] = now;
-                if (progress == 14)                     t[1] = now;
-                if (progress > 14 && progress <= 71)    t[2] = now;
-                if (progress == 100)                    t[3] = now;
+                if (progress == 0)                   t[0] = now;
+                if (progress == 14)                  t[1] = now;
+                if (progress > 14 && progress <= 71) t[2] = now;
+                if (progress == 100)                 t[3] = now;
             });
             if (!ok) return null;
         } catch (Throwable e) {
@@ -887,11 +1005,11 @@ public class MainActivity extends AppCompatActivity {
             + "VAE Decode\n  CPU    : %s\n  GPU    : %s\n\n"
             + "Applied: %s",
             fmtMs(unetOcl),
-            r2   != null ? fmtMs(unetVlk) : "N/A (not supported)",
+            r2 != null ? fmtMs(unetVlk) : "N/A (not supported)",
             fmtMs(teCpu),
-            r3   != null ? fmtMs(teGpu)   : "N/A",
+            r3 != null ? fmtMs(teGpu)   : "N/A",
             fmtMs(vaeCpu),
-            r4   != null ? fmtMs(vaeGpu)  : "N/A",
+            r4 != null ? fmtMs(vaeGpu)  : "N/A",
             winner);
 
         AppLogger.log(this, "BENCH", msg.replace("\n", " | "));
