@@ -43,7 +43,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.textfield.TextInputEditText;
 import com.scsonic.fluxklein.FluxKlein;
 import com.scsonic.fluxklein.FluxKleinConfig;
@@ -95,7 +94,6 @@ public class MainActivity extends AppCompatActivity {
 
     // ── UI ────────────────────────────────────────────────────────────────────
     private MaterialButton             btnLog;
-    private MaterialButtonToggleGroup  toggleGpuBackend;
     private ScrollView        scrollView;
     private TextInputEditText etPrompt;
     private MaterialButton    btnPromptHistory;
@@ -118,9 +116,7 @@ public class MainActivity extends AppCompatActivity {
     private ImageView         ivResult;
     private TextView          tvResultTiming;
 
-    // ── Backend selection ─────────────────────────────────────────────────────
-    // 1=Vulkan, 2=CPU (TE and VAE are always CPU — GPU causes crashes)
-    private int gpuBackendType = 2;
+    // All backends fixed to CPU — Vulkan/OpenCL cause OOM crashes on device
 
     // ── State ─────────────────────────────────────────────────────────────────
     private String  inputImagePath = "";
@@ -166,8 +162,7 @@ public class MainActivity extends AppCompatActivity {
     // =========================================================================
 
     private void bindViews() {
-        btnLog           = findViewById(R.id.btnLog);
-        toggleGpuBackend = findViewById(R.id.toggleGpuBackend);
+        btnLog = findViewById(R.id.btnLog);
         scrollView         = findViewById(R.id.scrollView);
         etPrompt         = findViewById(R.id.etPrompt);
         btnPromptHistory = findViewById(R.id.btnPromptHistory);
@@ -204,9 +199,6 @@ public class MainActivity extends AppCompatActivity {
             if (currentResultBitmap != null) showFullscreenImage(currentResultBitmap);
         });
 
-        toggleGpuBackend.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
-            if (isChecked) gpuBackendType = (checkedId == R.id.btnTransformerVulkan) ? 1 : 2;
-        });
     }
 
     // =========================================================================
@@ -422,12 +414,10 @@ public class MainActivity extends AppCompatActivity {
 
         addToHistory(prompt);
 
-        String tfLabel = gpuBackendType == 1 ? "Vulkan" : "CPU";
         String genParams = "size=" + width + "x" + height
             + " seed=" + seed + " steps=4"
             + (inputImagePath.isEmpty() ? "" : " img2img=true")
             + " seq=" + ((width / 16) * (height / 16))
-            + " tf=" + tfLabel
             + " prompt=\"" + prompt.replace("\"", "\\\"") + "\"";
 
         // Sentinel: survives native crashes / SIGKILL that bypass the Java UncaughtExceptionHandler.
@@ -438,7 +428,7 @@ public class MainActivity extends AppCompatActivity {
 
         FluxKleinConfig config = new FluxKleinConfig.Builder(DEFAULT_MODEL_PATH, prompt)
             .seed(seed).steps(4).imageSize(width, height).inputImagePath(inputImagePath)
-            .gpuBackend(gpuBackendType).textEncoderOnCPU(true).vaeOnCPU(true)
+            .gpuBackend(2).textEncoderOnCPU(true).vaeOnCPU(true)
             .build();
 
         isGenerating = true;

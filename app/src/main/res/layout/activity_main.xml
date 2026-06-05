@@ -228,71 +228,7 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <!-- Divider -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="14dp"
-                    android:layout_marginBottom="8dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- Backend section label -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/label_backend"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="11sp"
-                    android:textAllCaps="true"
-                    android:letterSpacing="0.08"
-                    android:layout_marginBottom="10dp" />
-
-                <!-- Transformer backend row (CPU / Vulkan) — TE and VAE always CPU -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/backend_transformer_label"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="13sp" />
-
-                    <com.google.android.material.button.MaterialButtonToggleGroup
-                        android:id="@+id/toggleGpuBackend"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:singleSelection="true"
-                        app:selectionRequired="true"
-                        app:checkedButton="@id/btnTransformerCPU">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnTransformerCPU"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/backend_cpu"
-                            android:textSize="11sp"
-                            android:minWidth="0dp"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnTransformerVulkan"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/backend_vulkan"
-                            android:textSize="11sp"
-                            android:minWidth="0dp"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp" />
-                    </com.google.android.material.button.MaterialButtonToggleGroup>
-                </LinearLayout>
+                <!-- Backend is always CPU — Vulkan causes OOM crash on this device -->
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
