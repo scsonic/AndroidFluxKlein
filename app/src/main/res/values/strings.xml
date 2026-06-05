@@ -20,4 +20,16 @@
     <string name="saved_to_gallery">Saved to gallery</string>
     <string name="tap_to_close">Tap to close</string>
     <string name="no_history">No prompt history yet</string>
+    <string name="label_backend">Backend</string>
+    <string name="backend_gpu_label">GPU</string>
+    <string name="backend_te_label">Text Encoder</string>
+    <string name="backend_vae_label">VAE</string>
+    <string name="backend_cpu">CPU</string>
+    <string name="backend_gpu">GPU</string>
+    <string name="backend_opencl">OpenCL</string>
+    <string name="backend_vulkan">Vulkan</string>
+    <string name="btn_log">Log</string>
+    <string name="log_title">App Log</string>
+    <string name="log_close">Close</string>
+    <string name="log_clear">Clear</string>
 </resources>

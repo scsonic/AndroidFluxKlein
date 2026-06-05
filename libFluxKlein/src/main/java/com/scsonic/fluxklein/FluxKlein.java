@@ -45,6 +45,9 @@ public class FluxKlein {
                 config.imageHeight,
                 outPath,
                 config.inputImagePath,
+                config.gpuBackend,
+                config.textEncoderOnCPU,
+                config.vaeOnCPU,
                 listener
         );
     }
@@ -62,6 +65,9 @@ public class FluxKlein {
             int imageHeight,
             String outPath,
             String inputImagePath,
+            int gpuBackend,
+            boolean textEncoderOnCPU,
+            boolean vaeOnCPU,
             ProgressListener listener
     );
 }

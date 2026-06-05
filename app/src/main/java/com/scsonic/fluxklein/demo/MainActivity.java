@@ -43,6 +43,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.textfield.TextInputEditText;
 import com.scsonic.fluxklein.FluxKlein;
 import com.scsonic.fluxklein.FluxKleinConfig;
@@ -74,22 +75,29 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_HISTORY = "prompt_history";
     private static final int    MAX_HISTORY = 20;
 
-    // Pixel thresholds for size-preset colour coding
-    private static final long PX_GREEN = 256L * 256;   // < → green
-    private static final long PX_RED   = 1280L * 720;  // >= → red
+    // Pixel thresholds for size-preset colour coding.
+    // Model enforces minimum 256 on each side; max_image_seq_len=4096 tokens = (W/16)*(H/16).
+    private static final long PX_GREEN  = 512L * 512;  // < this → green  (< 262k px, ~8 GB RAM)
+    private static final long PX_RED    = 768L * 768;  // >= this → red   (≥ 590k px, ~16 GB RAM)
+    private static final int  MAX_SEQ   = 4096;        // scheduler max_image_seq_len; beyond → over-limit
 
-    // Size presets [width, height], all multiples of 16
+    // Size presets [width, height], all multiples of 16 and both dimensions ≥ 256
+    // (model clamps any dimension below 256 to 256 automatically)
     private static final int[][] PRESETS_1_1 = {
-        {128,128},{256,256},{384,384},{512,512},{640,640},{768,768},{1024,1024}
+        {256,256},{384,384},{512,512},{640,640},{768,768},{1024,1024}
     };
     private static final int[][] PRESETS_4_3 = {
-        {128,96},{256,192},{384,288},{512,384},{640,480},{768,576},{1024,768},{1280,960}
+        {384,288},{512,384},{640,480},{768,576},{1024,768},{1280,960}
     };
     private static final int[][] PRESETS_16_9 = {
-        {256,144},{512,288},{768,432},{1024,576},{1280,720}
+        {512,288},{768,432},{1024,576},{1280,720}
     };
 
     // ── UI ────────────────────────────────────────────────────────────────────
+    private MaterialButton             btnLog;
+    private MaterialButtonToggleGroup  toggleGpuBackend;
+    private MaterialButtonToggleGroup  toggleTeBackend;
+    private MaterialButtonToggleGroup  toggleVaeBackend;
     private ScrollView        scrollView;
     private TextInputEditText etPrompt;
     private MaterialButton    btnPromptHistory;
@@ -111,6 +119,11 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout      layoutResult;
     private ImageView         ivResult;
     private TextView          tvResultTiming;
+
+    // ── Backend selection ─────────────────────────────────────────────────────
+    private int     gpuBackendType = 0;     // 0=OpenCL, 1=Vulkan
+    private boolean teOnCPU        = true;
+    private boolean vaeOnCPU       = true;
 
     // ── State ─────────────────────────────────────────────────────────────────
     private String  inputImagePath = "";
@@ -156,7 +169,11 @@ public class MainActivity extends AppCompatActivity {
     // =========================================================================
 
     private void bindViews() {
-        scrollView       = findViewById(R.id.scrollView);
+        btnLog             = findViewById(R.id.btnLog);
+        toggleGpuBackend   = findViewById(R.id.toggleGpuBackend);
+        toggleTeBackend    = findViewById(R.id.toggleTeBackend);
+        toggleVaeBackend   = findViewById(R.id.toggleVaeBackend);
+        scrollView         = findViewById(R.id.scrollView);
         etPrompt         = findViewById(R.id.etPrompt);
         btnPromptHistory = findViewById(R.id.btnPromptHistory);
         etSeed           = findViewById(R.id.etSeed);
@@ -187,8 +204,19 @@ public class MainActivity extends AppCompatActivity {
         btnGenerate.setOnClickListener(v    -> startGeneration());
         btnPromptHistory.setOnClickListener(this::showPromptHistoryPopup);
         btnSizePresets.setOnClickListener(this::showSizePresetsPopup);
+        btnLog.setOnClickListener(v -> showLogDialog());
         ivResult.setOnClickListener(v -> {
             if (currentResultBitmap != null) showFullscreenImage(currentResultBitmap);
+        });
+
+        toggleGpuBackend.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (isChecked) gpuBackendType = (checkedId == R.id.btnGpuVulkan) ? 1 : 0;
+        });
+        toggleTeBackend.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (isChecked) teOnCPU = (checkedId == R.id.btnTeCPU);
+        });
+        toggleVaeBackend.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (isChecked) vaeOnCPU = (checkedId == R.id.btnVaeCPU);
         });
     }
 
@@ -300,7 +328,7 @@ public class MainActivity extends AppCompatActivity {
         note.setPadding(dp(12), dp(8), dp(12), dp(6));
         note.setTextSize(11f);
         note.setTextColor(ContextCompat.getColor(this, R.color.popup_section_text));
-        note.setText("🟢 ~8 GB RAM   🟡 ~12 GB RAM   🔴 ~16 GB RAM");
+        note.setText("🟢 <512×512 ~8 GB   🟡 ~12 GB   🔴 ≥768×768 ~16 GB\n⚠️ seq>4096：超出訓練範圍，不建議使用\nMin each side: 256 px (model limit)");
         root.addView(note);
 
         ScrollView sv = new ScrollView(this);
@@ -329,7 +357,7 @@ public class MainActivity extends AppCompatActivity {
         for (int[] p : presets) {
             int w = p[0], h = p[1];
             TextView item = new TextView(this);
-            item.setText(w + " × " + h);
+            item.setText(isOverSeqLimit(w, h) ? w + " × " + h + "  ⚠️" : w + " × " + h);
             item.setTextSize(14f);
             item.setPadding(dp(20), dp(10), dp(20), dp(10));
 
@@ -365,8 +393,16 @@ public class MainActivity extends AppCompatActivity {
         parent.addView(div);
     }
 
+    /** True when (W/16)*(H/16) > MAX_SEQ — beyond the model's scheduler training range. */
+    private boolean isOverSeqLimit(int w, int h) {
+        return (w / 16) * (h / 16) > MAX_SEQ;
+    }
+
     /** Returns [bgColor, textColor] for a preset item based on pixel count. */
     private int[] presetColors(int w, int h) {
+        if (isOverSeqLimit(w, h)) return new int[]{
+            ContextCompat.getColor(this, R.color.preset_overlimit_bg),
+            ContextCompat.getColor(this, R.color.preset_overlimit_text)};
         long px = (long) w * h;
         if (px < PX_GREEN) return new int[]{
             ContextCompat.getColor(this, R.color.preset_green_bg),
@@ -397,8 +433,26 @@ public class MainActivity extends AppCompatActivity {
 
         addToHistory(prompt);
 
+        String gpuLabel = gpuBackendType == 1 ? "Vulkan" : "OpenCL";
+        String genParams = "size=" + width + "x" + height
+            + " seed=" + seed + " steps=4"
+            + (inputImagePath.isEmpty() ? "" : " img2img=true")
+            + " seq=" + ((width / 16) * (height / 16))
+            + " gpu=" + gpuLabel
+            + " te=" + (teOnCPU ? "CPU" : gpuLabel)
+            + " vae=" + (vaeOnCPU ? "CPU" : gpuLabel)
+            + " prompt=\"" + prompt.replace("\"", "\\\"") + "\"";
+
+        // Sentinel: survives native crashes / SIGKILL that bypass the Java UncaughtExceptionHandler.
+        // Cleared in mainHandler.post() which only runs when the executor thread finishes normally.
+        AppLogger.writeGenSentinel(this, genParams);
+
+        AppLogger.log(this, "GEN", "START " + genParams);
+
         FluxKleinConfig config = new FluxKleinConfig.Builder(DEFAULT_MODEL_PATH, prompt)
-            .seed(seed).steps(4).imageSize(width, height).inputImagePath(inputImagePath).build();
+            .seed(seed).steps(4).imageSize(width, height).inputImagePath(inputImagePath)
+            .gpuBackend(gpuBackendType).textEncoderOnCPU(teOnCPU).vaeOnCPU(vaeOnCPU)
+            .build();
 
         isGenerating = true;
         currentResultBitmap = null;
@@ -409,27 +463,56 @@ public class MainActivity extends AppCompatActivity {
         textEncoderMs = unetMs = vaeMs = 0;
 
         executor.submit(() -> {
-            boolean success;
+            boolean success = false;
+            String errMsg = null;
             try {
                 success = FluxKlein.generate(config, outPath, progress -> {
                     long now = System.currentTimeMillis();
-                    if (progress == 0)              timeAt0 = now;
-                    if (progress == 14)           { timeAt14 = now; textEncoderMs = timeAt14 - timeAt0; }
+                    if (progress == 0)                    timeAt0 = now;
+                    if (progress == 14)                 { timeAt14 = now; textEncoderMs = timeAt14 - timeAt0; }
                     if (progress >= 15 && progress <= 71) { timeAt71 = now; unetMs = timeAt71 - timeAt14; }
-                    if (progress == 100)            vaeMs = now - timeAt71;
+                    if (progress == 100)                  vaeMs = now - timeAt71;
                     long elapsed = now - startTime;
                     mainHandler.post(() -> updateProgress(progress, elapsed));
                 });
-            } catch (Exception e) {
-                Log.e(TAG, "Generation exception", e);
-                success = false;
+            } catch (OutOfMemoryError oom) {
+                Log.e(TAG, "OOM during generation", oom);
+                AppLogger.log(MainActivity.this, "OOM",
+                    "size=" + width + "x" + height
+                    + " seq=" + ((width / 16) * (height / 16))
+                    + " | " + oom);
+                errMsg = "Out of memory!\nTry a smaller image size.\n(current: " + width + "×" + height + ")";
+            } catch (Throwable t) {
+                Log.e(TAG, "Generation exception", t);
+                AppLogger.log(MainActivity.this, "ERR",
+                    "size=" + width + "x" + height + " | " + t);
+                errMsg = "Generation failed: " + t.getMessage();
             }
+
             long totalMs = System.currentTimeMillis() - startTime;
-            boolean ok = success;
+            if (success) {
+                AppLogger.log(MainActivity.this, "GEN",
+                    "END   success=true  total=" + fmtMs(totalMs)
+                    + (textEncoderMs > 0 ? String.format(Locale.US,
+                        "  textEnc=%s 512tok %.2ftok/s", fmtMs(textEncoderMs),
+                        512000.0 / textEncoderMs) : "")
+                    + (unetMs > 0 ? "  unet=" + fmtMs(unetMs) : "")
+                    + (vaeMs  > 0 ? "  vae="  + fmtMs(vaeMs)  : ""));
+            } else {
+                AppLogger.log(MainActivity.this, "GEN",
+                    "END   success=false total=" + fmtMs(totalMs));
+            }
+
+            boolean ok       = success;
+            String  finalErr = errMsg;
             mainHandler.post(() -> {
                 isGenerating = false;
+                // Generation finished normally (success or graceful error) — clear sentinel.
+                // If the app crashed before reaching here, sentinel remains for next startup.
+                AppLogger.clearGenSentinel(MainActivity.this);
                 if (ok) showResult(outPath, totalMs);
-                else    showError("Generation failed.\nEnsure model files exist at:\n"
+                else    showError(finalErr != null ? finalErr
+                            : "Generation failed.\nEnsure model files exist at:\n"
                             + DEFAULT_MODEL_PATH + "\n\nadb push <model_dir> /sdcard/mnn_flux/model");
             });
         });
@@ -444,7 +527,7 @@ public class MainActivity extends AppCompatActivity {
     private int parseDimension(TextInputEditText et, int def) {
         try {
             String s = et.getText() != null ? et.getText().toString().trim() : "";
-            return Math.max(64, Integer.parseInt(s));
+            return Math.max(256, Integer.parseInt(s));
         } catch (NumberFormatException e) { return def; }
     }
 
@@ -468,7 +551,7 @@ public class MainActivity extends AppCompatActivity {
         tvProgressPct.setText(pct + "%");
         String phase = pct <= 14 ? "Text Encoding…" : pct <= 71 ? "Diffusion (UNet)…" : "VAE Decode…";
         StringBuilder sb = new StringBuilder(phase).append("\n");
-        if (textEncoderMs > 0) sb.append("TextEncoder : ").append(fmtMs(textEncoderMs)).append("\n");
+        if (textEncoderMs > 0) sb.append(fmtTeStats(textEncoderMs)).append("\n");
         if (unetMs        > 0) sb.append("UNet        : ").append(fmtMs(unetMs)).append("\n");
         if (vaeMs         > 0) sb.append("VAE         : ").append(fmtMs(vaeMs)).append("\n");
         sb.append("Elapsed     : ").append(fmtMs(elapsedMs));
@@ -489,7 +572,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         StringBuilder sb = new StringBuilder();
-        if (textEncoderMs > 0) sb.append("TextEncoder : ").append(fmtMs(textEncoderMs)).append("\n");
+        if (textEncoderMs > 0) sb.append(fmtTeStats(textEncoderMs)).append("\n");
         if (unetMs        > 0) sb.append("UNet        : ").append(fmtMs(unetMs)).append("\n");
         if (vaeMs         > 0) sb.append("VAE Decode  : ").append(fmtMs(vaeMs)).append("\n");
         sb.append("Total       : ").append(fmtMs(totalMs));
@@ -503,6 +586,43 @@ public class MainActivity extends AppCompatActivity {
         btnGenerate.setText(R.string.generate);
         tvError.setText(msg);
         cardError.setVisibility(View.VISIBLE);
+    }
+
+    // =========================================================================
+    // Log dialog
+    // =========================================================================
+
+    private void showLogDialog() {
+        String content = AppLogger.readAll(this);
+
+        // Monospace text view
+        android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText(content);
+        tv.setTextSize(10.5f);
+        tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+        tv.setTextIsSelectable(true);
+        int pad = dp(10);
+        tv.setPadding(pad, pad, pad, pad);
+
+        // Wrap in a ScrollView so long logs are scrollable
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(tv);
+
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.log_title)
+            .setView(sv)
+            .setPositiveButton(R.string.log_close, null)
+            .setNeutralButton(R.string.log_clear, (d, w) -> {
+                AppLogger.clearLog(this);
+                AppLogger.log(this, "APP", "Log cleared by user");
+                Toast.makeText(this, "Log cleared", Toast.LENGTH_SHORT).show();
+            })
+            .create();
+
+        dialog.show();
+
+        // Auto-scroll to bottom after the view is laid out
+        sv.post(() -> sv.fullScroll(android.view.View.FOCUS_DOWN));
     }
 
     // =========================================================================
@@ -640,5 +760,12 @@ public class MainActivity extends AppCompatActivity {
         if (ms <= 0) return "0 ms";
         long s = ms / 1000, m = s / 60;
         return m > 0 ? ms + " ms (" + m + "m " + (s % 60) + "s)" : ms + " ms (" + s + "s)";
+    }
+
+    /** Text-encoder timing line: time + fixed 512-token throughput. */
+    private static String fmtTeStats(long ms) {
+        double tokPerSec = ms > 0 ? 512000.0 / ms : 0;
+        return String.format(Locale.US,
+            "TextEncoder : %s   512 tok  %.2f tok/s", fmtMs(ms), tokPerSec);
     }
 }

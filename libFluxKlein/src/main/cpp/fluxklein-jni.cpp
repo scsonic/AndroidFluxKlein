@@ -14,6 +14,7 @@ using namespace MNN::DIFFUSION;
 //   String modelPath, String prompt,
 //   int seed, int steps, int imageWidth, int imageHeight,
 //   String outPath, String inputImagePath,
+//   int gpuBackend, boolean textEncoderOnCPU, boolean vaeOnCPU,
 //   ProgressListener listener            <- may be null
 // ) : boolean
 extern "C" JNIEXPORT jboolean JNICALL
@@ -28,6 +29,9 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
         jint     jHeight,
         jstring  jOutPath,
         jstring  jImagePath,
+        jint     jGpuBackend,
+        jboolean jTextEncoderOnCPU,
+        jboolean jVaeOnCPU,
         jobject  jListener)
 {
     // ---- String conversions ----
@@ -52,6 +56,10 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
     int height = static_cast<int>(jHeight);
     if (seed == -1) seed = 42; // fallback; caller should randomise before passing
 
+    MNNForwardType gpuFwdType = (jGpuBackend == 1) ? MNN_FORWARD_VULKAN : MNN_FORWARD_OPENCL;
+    bool teOnCPU  = (jTextEncoderOnCPU  == JNI_TRUE);
+    bool vaeOnCPU = (jVaeOnCPU == JNI_TRUE);
+
     // ---- Resolve ProgressListener.onProgress(I)V ----
     jmethodID onProgressMid = nullptr;
     if (jListener != nullptr) {
@@ -67,16 +75,20 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
     };
 
     // ---- Create and run Diffusion ----
-    LOGI("Creating diffusion instance: size=%dx%d steps=%d seed=%d", width, height, steps, seed);
+    LOGI("Creating diffusion: size=%dx%d steps=%d seed=%d gpu=%s te=%s vae=%s",
+         width, height, steps, seed,
+         jGpuBackend == 1 ? "Vulkan" : "OpenCL",
+         teOnCPU  ? "CPU" : "GPU",
+         vaeOnCPU ? "CPU" : "GPU");
 
     std::unique_ptr<Diffusion> diffusion(Diffusion::createDiffusion(
             sModelPath,
             FLUX2_KLEIN_DIFFUSION,
-            MNN_FORWARD_OPENCL,
+            gpuFwdType,
             /*memoryMode=*/0,
             width, height,
-            /*textEncoderOnCPU=*/true,
-            /*vaeOnCPU=*/true,
+            teOnCPU,
+            vaeOnCPU,
             GPU_MEMORY_AUTO,
             PRECISION_AUTO,
             CFG_MODE_AUTO,

@@ -22,6 +22,12 @@ public class FluxKleinConfig {
     public final int imageHeight;
     /** Empty string means no reference image (text-to-image). */
     public final String inputImagePath;
+    /** GPU backend for the UNet (and any GPU-assigned components). 0=OpenCL, 1=Vulkan. */
+    public final int gpuBackend;
+    /** True = run text encoder on CPU; false = run on the selected GPU backend. */
+    public final boolean textEncoderOnCPU;
+    /** True = run VAE on CPU; false = run on the selected GPU backend. */
+    public final boolean vaeOnCPU;
 
     private FluxKleinConfig(Builder b) {
         this.modelPath = b.modelPath;
@@ -31,6 +37,9 @@ public class FluxKleinConfig {
         this.imageWidth = b.imageWidth;
         this.imageHeight = b.imageHeight;
         this.inputImagePath = b.inputImagePath != null ? b.inputImagePath : "";
+        this.gpuBackend = b.gpuBackend;
+        this.textEncoderOnCPU = b.textEncoderOnCPU;
+        this.vaeOnCPU = b.vaeOnCPU;
     }
 
     public static class Builder {
@@ -41,6 +50,9 @@ public class FluxKleinConfig {
         private int imageWidth = 512;
         private int imageHeight = 512;
         private String inputImagePath = "";
+        private int gpuBackend = 0;          // 0=OpenCL, 1=Vulkan
+        private boolean textEncoderOnCPU = true;
+        private boolean vaeOnCPU = true;
 
         public Builder(String modelPath, String prompt) {
             if (modelPath == null || modelPath.isEmpty())
@@ -79,6 +91,15 @@ public class FluxKleinConfig {
             return this;
         }
 
+        /** GPU backend: 0=OpenCL (default), 1=Vulkan. Applies to UNet and any GPU-assigned modules. */
+        public Builder gpuBackend(int backend) { this.gpuBackend = backend; return this; }
+
+        /** True = text encoder on CPU (safer, default); false = text encoder on the GPU backend. */
+        public Builder textEncoderOnCPU(boolean onCPU) { this.textEncoderOnCPU = onCPU; return this; }
+
+        /** True = VAE on CPU (default); false = VAE on the GPU backend (typically faster). */
+        public Builder vaeOnCPU(boolean onCPU) { this.vaeOnCPU = onCPU; return this; }
+
         public FluxKleinConfig build() {
             return new FluxKleinConfig(this);
         }
@@ -92,6 +113,9 @@ public class FluxKleinConfig {
                 ", steps=" + steps +
                 ", size=" + imageWidth + "x" + imageHeight +
                 ", inputImage='" + (inputImagePath.isEmpty() ? "none" : inputImagePath) + '\'' +
+                ", gpu=" + (gpuBackend == 1 ? "Vulkan" : "OpenCL") +
+                ", te=" + (textEncoderOnCPU ? "CPU" : "GPU") +
+                ", vae=" + (vaeOnCPU ? "CPU" : "GPU") +
                 '}';
     }
 }

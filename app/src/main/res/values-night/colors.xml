@@ -7,6 +7,8 @@
     <color name="preset_yellow_text">#FFD54F</color>
     <color name="preset_red_bg">#4A1A1A</color>
     <color name="preset_red_text">#EF9A9A</color>
+    <color name="preset_overlimit_bg">#7F0000</color>
+    <color name="preset_overlimit_text">#FFCDD2</color>
 
     <!-- Popup chrome (dark mode) -->
     <color name="popup_bg">#2B2938</color>
