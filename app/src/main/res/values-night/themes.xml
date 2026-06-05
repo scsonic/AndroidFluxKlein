@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark theme — warm navy/purple palette -->
+    <style name="Theme.FluxKleinDemo" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">#D0BCFF</item>
+        <item name="colorOnPrimary">#381E72</item>
+        <item name="colorPrimaryContainer">#4F378B</item>
+        <item name="colorOnPrimaryContainer">#EADDFF</item>
+        <item name="colorSecondary">#CCC2DC</item>
+        <item name="colorOnSecondary">#332D41</item>
+        <item name="colorTertiary">#EFB8C8</item>
+        <item name="colorOnTertiary">#492532</item>
+        <item name="colorSurface">#2B2738</item>
+        <item name="colorOnSurface">#E6E1E5</item>
+        <item name="colorSurfaceVariant">#49454F</item>
+        <item name="colorOnSurfaceVariant">#CAC4D0</item>
+        <item name="colorError">#CF6679</item>
+        <item name="android:colorBackground">#1C1B2A</item>
+        <item name="android:windowBackground">#1C1B2A</item>
+        <item name="android:statusBarColor">#1C1B2A</item>
+        <item name="android:navigationBarColor">#1C1B2A</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

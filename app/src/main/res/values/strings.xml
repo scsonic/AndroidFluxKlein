@@ -3,10 +3,12 @@
     <string name="app_name">FLUX.2-Klein Generator</string>
     <string name="label_prompt">Prompt</string>
     <string name="hint_prompt">Describe the image you want to generate…</string>
+    <string name="btn_history">History ▾</string>
     <string name="label_seed">Random Seed (optional — empty = random)</string>
     <string name="hint_seed">e.g. 42</string>
     <string name="btn_random">Random</string>
     <string name="label_size">Output Image Size</string>
+    <string name="btn_presets">Presets ▾</string>
     <string name="label_ref_image">Reference Image (optional)</string>
     <string name="select_image">Select Reference Image</string>
     <string name="change_image">Change Image</string>
@@ -14,5 +16,8 @@
     <string name="generate">Generate ✨</string>
     <string name="generating">Generating… (~4–5 min)</string>
     <string name="desc_input_preview">Reference image preview</string>
-    <string name="desc_result">Generated image</string>
+    <string name="desc_result">Generated image — tap to view fullscreen</string>
+    <string name="saved_to_gallery">Saved to gallery</string>
+    <string name="tap_to_close">Tap to close</string>
+    <string name="no_history">No prompt history yet</string>
 </resources>

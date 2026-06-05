@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Size-preset item backgrounds and text (dark mode) -->
+    <color name="preset_green_bg">#1B5E20</color>
+    <color name="preset_green_text">#A5D6A7</color>
+    <color name="preset_yellow_bg">#4E3100</color>
+    <color name="preset_yellow_text">#FFD54F</color>
+    <color name="preset_red_bg">#4A1A1A</color>
+    <color name="preset_red_text">#EF9A9A</color>
+
+    <!-- Popup chrome (dark mode) -->
+    <color name="popup_bg">#2B2938</color>
+    <color name="popup_section_text">#CAC4D0</color>
+    <color name="popup_item_text">#E6E1E5</color>
+    <color name="popup_divider">#3A3847</color>
+
+    <!-- Progress bar track (dark mode) -->
+    <color name="color_progress_track">#3A3847</color>
+</resources>

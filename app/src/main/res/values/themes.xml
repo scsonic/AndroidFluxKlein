@@ -1,13 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.FluxKleinDemo" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/accent_purple</item>
-        <item name="colorPrimaryVariant">#FF7C5CBF</item>
-        <item name="colorOnPrimary">#FF000000</item>
-        <item name="colorSurface">@color/card_bg</item>
-        <item name="colorOnSurface">@color/text_primary</item>
-        <item name="android:windowBackground">@color/bg_dark</item>
-        <item name="android:statusBarColor">@color/bg_dark</item>
-        <item name="android:navigationBarColor">@color/bg_dark</item>
+    <!-- Light theme — warm purple/lavender palette -->
+    <style name="Theme.FluxKleinDemo" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">#6750A4</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#EADDFF</item>
+        <item name="colorOnPrimaryContainer">#21005D</item>
+        <item name="colorSecondary">#625B71</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorTertiary">#7D5260</item>
+        <item name="colorOnTertiary">#FFFFFF</item>
+        <item name="colorSurface">#FFFBFE</item>
+        <item name="colorOnSurface">#1C1B1F</item>
+        <item name="colorSurfaceVariant">#E7E0EC</item>
+        <item name="colorOnSurfaceVariant">#49454F</item>
+        <item name="colorError">#B3261E</item>
+        <item name="android:colorBackground">#FAF7FF</item>
+        <item name="android:windowBackground">#FAF7FF</item>
+        <item name="android:statusBarColor">#FAF7FF</item>
+        <item name="android:navigationBarColor">#FAF7FF</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>
