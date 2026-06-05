@@ -28,6 +28,7 @@
     <string name="backend_gpu">GPU</string>
     <string name="backend_opencl">OpenCL</string>
     <string name="backend_vulkan">Vulkan</string>
+    <string name="btn_benchmark">Benchmark</string>
     <string name="btn_log">Log</string>
     <string name="log_title">App Log</string>
     <string name="log_close">Close</string>
