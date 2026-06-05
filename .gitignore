@@ -12,6 +12,10 @@ gradle/wrapper/gradle-wrapper.jar
 .cxx/
 */.cxx/
 
+# ── Prebuilt binaries (obtain from github.com/scsonic/MNN) ────
+*.so
+*.a
+
 # ── Android Studio / IntelliJ ─────────────────────────────────
 .idea/
 *.iml

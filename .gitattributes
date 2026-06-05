@@ -1,1 +1,2 @@
-*.so filter=lfs diff=lfs merge=lfs -text
+# Prebuilt .so binaries and model files are excluded from this repo.
+# See README.md for how to obtain them.
