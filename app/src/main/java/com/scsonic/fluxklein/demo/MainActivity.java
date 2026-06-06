@@ -19,6 +19,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.TextUtils;
@@ -135,6 +136,7 @@ public class MainActivity extends AppCompatActivity {
     private final ExecutorService executor    = Executors.newSingleThreadExecutor();
     private final Handler         mainHandler = new Handler(Looper.getMainLooper());
     private ActivityResultLauncher<String> imagePicker;
+    private PowerManager.WakeLock wakeLock;
 
     // =========================================================================
     // Lifecycle
@@ -155,6 +157,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         executor.shutdownNow();
+        releaseWakeLocks();
     }
 
     // =========================================================================
@@ -513,6 +516,13 @@ public class MainActivity extends AppCompatActivity {
     // =========================================================================
 
     private void showGenerating() {
+        // Keep screen on and hold CPU wake lock for the duration of inference.
+        // This keeps the Activity at oom_adj=0 so Android's LMK cannot kill the process.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FluxKlein:inference");
+        wakeLock.acquire(8 * 60 * 1000L); // 8-min ceiling; released early on completion
+
         cardError.setVisibility(View.GONE);
         layoutResult.setVisibility(View.GONE);
         layoutProgress.setVisibility(View.VISIBLE);
@@ -521,6 +531,14 @@ public class MainActivity extends AppCompatActivity {
         tvProgressPhase.setText("");
         btnGenerate.setEnabled(false);
         btnGenerate.setText(R.string.generating);
+    }
+
+    private void releaseWakeLocks() {
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+            wakeLock = null;
+        }
     }
 
     private void updateProgress(int pct, long elapsedMs) {
@@ -536,6 +554,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showResult(String outPath, long totalMs) {
+        releaseWakeLocks();
         layoutProgress.setVisibility(View.GONE);
         btnGenerate.setEnabled(true);
         btnGenerate.setText(R.string.generate);
@@ -558,6 +577,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showError(String msg) {
+        releaseWakeLocks();
         layoutProgress.setVisibility(View.GONE);
         btnGenerate.setEnabled(true);
         btnGenerate.setText(R.string.generate);
