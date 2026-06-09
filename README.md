@@ -26,14 +26,14 @@ Here are some examples of images generated on-device:
 
 | Example 1 | Example 2 | Example 3 |
 | :---: | :---: | :---: |
-| <img src="screenshot/FluxKlein_20260608_092913.jpg" width="220"/><br/>`FluxKlein_20260608_092913` | <img src="screenshot/FluxKlein_20260608_093647.jpg" width="220"/><br/>`FluxKlein_20260608_093647` | <img src="screenshot/FluxKlein_20260609_041654.jpg" width="220"/><br/>`FluxKlein_20260609_041654` |
+| <img src="screenshot/FluxKlein_20260609_160539.jpg" width="220"/><br/>`FluxKlein_20260609_160539` | <img src="screenshot/FluxKlein_20260609_155714.jpg" width="220"/><br/>`FluxKlein_20260609_155714` | <img src="screenshot/FluxKlein_20260609_150107.jpg" width="220"/><br/>`FluxKlein_20260609_150107` |
 
 ### Side-by-Side Comparisons (Image-to-Image / Prompt guided)
 These comparisons showcase the input reference image (left) compared to the generated output (right):
 
-| Comparison 1 | Comparison 2 |
-| :---: | :---: |
-| <img src="screenshot/FluxKlein_20260609_041654_comparison.jpg" width="350"/><br/>`FluxKlein_20260609_041654_comparison` | <img src="screenshot/FluxKlein_20260608_091333_comparison.jpg" width="350"/><br/>`FluxKlein_20260608_091333_comparison` |
+| Comparison 1 | Comparison 2 | Comparison 3 | Comparison 4 |
+| :---: | :---: | :---: | :---: |
+| <img src="screenshot/FluxKlein_20260609_041654_comparison.jpg" width="180"/><br/>`FluxKlein_20260609_041654` | <img src="screenshot/FluxKlein_20260608_091333_comparison.jpg" width="180"/><br/>`FluxKlein_20260608_091333` | <img src="screenshot/FluxKlein_20260608_035125_comparison.jpg" width="180"/><br/>`FluxKlein_20260608_035125` | <img src="screenshot/compare3.jpg" width="180"/><br/>`compare3` |
 
 ## Project Structure
 
