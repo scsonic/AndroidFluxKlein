@@ -100,19 +100,26 @@ public class AppLogger {
 
     /**
      * On app startup: if a sentinel file exists the previous session crashed during generation.
-     * Imports the sentinel params into the main log and deletes the sentinel.
+     * Imports the sentinel params into the main log, deletes the sentinel, and returns the
+     * params line so the caller can show a dialog. Returns null if no sentinel was found.
      */
-    public static synchronized void checkGenSentinel(Context ctx) {
+    public static synchronized String popGenSentinel(Context ctx) {
         File f = new File(ctx.getFilesDir(), SENTINEL_FILE);
-        if (!f.exists()) return;
-        appendLine(ctx, LOG_FILE, ts() + " [CRASH] *** App crashed during generation (native/OOM/signal) ***");
+        if (!f.exists()) return null;
+        String params = null;
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
-            String line;
-            while ((line = br.readLine()) != null)
-                appendLine(ctx, LOG_FILE, "  last_gen: " + line);
+            params = br.readLine();
         } catch (IOException ignored) { }
+        appendLine(ctx, LOG_FILE, ts() + " [CRASH] *** App was force-closed during generation (LMK/OOM/signal) ***");
+        if (params != null) appendLine(ctx, LOG_FILE, "  last_gen: " + params);
         //noinspection ResultOfMethodCallIgnored
         f.delete();
+        return params != null ? params : "";
+    }
+
+    /** @deprecated Use popGenSentinel — this variant logs but discards the return value. */
+    public static synchronized void checkGenSentinel(Context ctx) {
+        popGenSentinel(ctx);
     }
 
     /** On app startup: if a pending crash file exists, move its content into the main log. */

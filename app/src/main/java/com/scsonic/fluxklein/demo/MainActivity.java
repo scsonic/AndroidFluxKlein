@@ -105,6 +105,7 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton             btnLog;
     private ScrollView        scrollView;
     private TextInputEditText etPrompt;
+    private MaterialButton    btnClearPrompt;
     private MaterialButton    btnPromptHistory;
     private MaterialCheckBox  cbAutoSeed;
     private TextInputEditText etSeed;
@@ -161,6 +162,7 @@ public class MainActivity extends AppCompatActivity {
         setupImagePicker();
         loadHistory();
         requestStoragePermission();
+        checkPendingCrash();
     }
 
     @Override
@@ -178,6 +180,7 @@ public class MainActivity extends AppCompatActivity {
         btnLog = findViewById(R.id.btnLog);
         scrollView         = findViewById(R.id.scrollView);
         etPrompt         = findViewById(R.id.etPrompt);
+        btnClearPrompt   = findViewById(R.id.btnClearPrompt);
         btnPromptHistory = findViewById(R.id.btnPromptHistory);
         cbAutoSeed       = findViewById(R.id.cbAutoSeed);
         etSeed           = findViewById(R.id.etSeed);
@@ -204,6 +207,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupListeners() {
+        btnClearPrompt.setOnClickListener(v -> etPrompt.setText(""));
         btnRandomSeed.setOnClickListener(v ->
             etSeed.setText(String.valueOf(new Random().nextInt(Integer.MAX_VALUE))));
         cbAutoSeed.setOnCheckedChangeListener((btn, checked) -> setSeedRowEnabled(!checked));
@@ -216,9 +220,6 @@ public class MainActivity extends AppCompatActivity {
         btnLog.setOnClickListener(v -> showLogDialog());
         ivResult.setOnClickListener(v -> {
             if (currentResultBitmap != null) showFullscreenImage(currentResultBitmap);
-        });
-        rgGpuBackend.setOnCheckedChangeListener((group, checkedId) -> {
-            if (checkedId == R.id.rbOpenCL) showOpenCLWarning();
         });
         setupCfgScaleSync();
     }
@@ -298,7 +299,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 InputStream is = getContentResolver().openInputStream(uri);
                 if (is == null) return;
-                File f = new File(getCacheDir(), "input_" + UUID.randomUUID() + ".jpg");
+                File f = new File(getFilesDir(), "input_" + UUID.randomUUID() + ".jpg");
                 FileOutputStream fos = new FileOutputStream(f);
                 byte[] buf = new byte[8192]; int n;
                 while ((n = is.read(buf)) != -1) fos.write(buf, 0, n);
@@ -689,17 +690,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================================
-    // OpenCL warning dialog
+    // LMK / crash recovery dialog
     // =========================================================================
 
-    private void showOpenCLWarning() {
+    private void checkPendingCrash() {
+        String params = FluxKleinApp.pendingCrashParams;
+        if (params == null) return;
+        FluxKleinApp.pendingCrashParams = null;
         new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(R.string.gpu_opencl_warn_title)
-            .setMessage(R.string.gpu_opencl_warn_msg)
-            .setPositiveButton(R.string.gpu_opencl_warn_confirm, null)
-            .setNegativeButton(R.string.gpu_opencl_warn_cancel, (d, w) ->
-                rgGpuBackend.check(R.id.rbVulkan))
-            .setCancelable(false)
+            .setTitle("Previous session ended by system")
+            .setMessage("The app was force-closed during the last generation "
+                + "(low memory / OOM / signal).\n\nLast run:\n" + params)
+            .setPositiveButton("OK", null)
             .show();
     }
 
@@ -809,8 +811,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveSideBySideToGallery(String inputPath, Bitmap output) {
+        if (output == null) {
+            AppLogger.log(this, "COMPARE", "skipped: output bitmap is null");
+            return;
+        }
         Bitmap composite = buildSideBySide(inputPath, output);
-        if (composite == null) return;
+        if (composite == null) {
+            AppLogger.log(this, "COMPARE", "buildSideBySide returned null — input file missing or OOM: " + inputPath);
+            return;
+        }
         try {
             File tmp = new File(getCacheDir(), "compare_" + UUID.randomUUID() + ".jpg");
             try (FileOutputStream fos = new FileOutputStream(tmp)) {
@@ -819,28 +828,50 @@ public class MainActivity extends AppCompatActivity {
             composite.recycle();
             String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
             saveFile(tmp.getAbsolutePath(), "FluxKlein_" + ts + "_comparison.jpg", false);
-        } catch (Exception e) {
+            AppLogger.log(this, "COMPARE", "saved: FluxKlein_" + ts + "_comparison.jpg");
+        } catch (Throwable e) {
+            AppLogger.log(this, "COMPARE", "failed: " + e);
             Log.e(TAG, "saveSideBySideToGallery failed", e);
         }
     }
 
     private Bitmap buildSideBySide(String inputPath, Bitmap output) {
-        int W = output.getWidth();
-        int H = output.getHeight();
-        Bitmap rawInput = BitmapFactory.decodeFile(inputPath);
-        if (rawInput == null) return null;
-        float scale = Math.min((float) W / rawInput.getWidth(), (float) H / rawInput.getHeight());
-        int sw = Math.round(rawInput.getWidth() * scale);
-        int sh = Math.round(rawInput.getHeight() * scale);
-        Bitmap scaledInput = Bitmap.createScaledBitmap(rawInput, sw, sh, true);
-        rawInput.recycle();
-        Bitmap composite = Bitmap.createBitmap(W * 2, H, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(composite);
-        canvas.drawColor(Color.BLACK);
-        canvas.drawBitmap(scaledInput, (W - sw) / 2f, (H - sh) / 2f, null);
-        scaledInput.recycle();
-        canvas.drawBitmap(output, (float) W, 0f, null);
-        return composite;
+        try {
+            int W = output.getWidth();
+            int H = output.getHeight();
+
+            // First pass: get raw dimensions without allocating pixels
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(inputPath, bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+
+            // Calculate inSampleSize to decode at roughly target (W×H) resolution
+            int sampleSize = 1;
+            int rw = bounds.outWidth, rh = bounds.outHeight;
+            while (rw / 2 >= W && rh / 2 >= H) { rw /= 2; rh /= 2; sampleSize *= 2; }
+
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = sampleSize;
+            Bitmap rawInput = BitmapFactory.decodeFile(inputPath, opts);
+            if (rawInput == null) return null;
+
+            float scale = Math.min((float) W / rawInput.getWidth(), (float) H / rawInput.getHeight());
+            int sw = Math.round(rawInput.getWidth() * scale);
+            int sh = Math.round(rawInput.getHeight() * scale);
+            Bitmap scaledInput = Bitmap.createScaledBitmap(rawInput, sw, sh, true);
+            rawInput.recycle();
+            Bitmap composite = Bitmap.createBitmap(W * 2, H, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(composite);
+            canvas.drawColor(Color.BLACK);
+            canvas.drawBitmap(scaledInput, (W - sw) / 2f, (H - sh) / 2f, null);
+            scaledInput.recycle();
+            canvas.drawBitmap(output, (float) W, 0f, null);
+            return composite;
+        } catch (OutOfMemoryError oom) {
+            AppLogger.log(this, "COMPARE", "OOM in buildSideBySide: " + oom.getMessage());
+            return null;
+        }
     }
 
     private void saveToGalleryLegacy(String srcPath, String filename) {

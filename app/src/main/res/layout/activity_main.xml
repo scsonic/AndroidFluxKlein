@@ -62,6 +62,18 @@
                         android:letterSpacing="0.08" />
 
                     <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearPrompt"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/btn_clear_prompt"
+                        android:textColor="?attr/colorError"
+                        android:textSize="12sp"
+                        android:minWidth="0dp"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp" />
+
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnPromptHistory"
                         style="@style/Widget.Material3.Button.TextButton"
                         android:layout_width="wrap_content"
