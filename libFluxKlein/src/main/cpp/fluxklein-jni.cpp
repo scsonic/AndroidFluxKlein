@@ -10,11 +10,14 @@
 
 using namespace MNN::DIFFUSION;
 
+#include <stdexcept>
+
 // com.scsonic.fluxklein.FluxKlein#nativeGenerate(
 //   String modelPath, String prompt,
 //   int seed, int steps, int imageWidth, int imageHeight,
 //   String outPath, String inputImagePath,
 //   int gpuBackend, boolean textEncoderOnCPU, boolean vaeOnCPU,
+//   float cfgScale,
 //   ProgressListener listener            <- may be null
 // ) : boolean
 extern "C" JNIEXPORT jboolean JNICALL
@@ -32,6 +35,7 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
         jint     jGpuBackend,
         jboolean jTextEncoderOnCPU,
         jboolean jVaeOnCPU,
+        jfloat   jCfgScale,
         jobject  jListener)
 {
     // ---- String conversions ----
@@ -63,6 +67,7 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
     else                       gpuFwdType = MNN_FORWARD_OPENCL;
     bool teOnCPU  = (jTextEncoderOnCPU  == JNI_TRUE);
     bool vaeOnCPU = (jVaeOnCPU == JNI_TRUE);
+    float cfgScale = static_cast<float>(jCfgScale);
 
     // ---- Resolve ProgressListener.onProgress(I)V ----
     jmethodID onProgressMid = nullptr;
@@ -79,41 +84,50 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
     };
 
     // ---- Create and run Diffusion ----
-    LOGI("Creating diffusion: size=%dx%d steps=%d seed=%d gpu=%s te=%s vae=%s",
+    LOGI("Creating diffusion: size=%dx%d steps=%d seed=%d gpu=%s te=%s vae=%s cfg=%.1f",
          width, height, steps, seed,
          jGpuBackend == 1 ? "Vulkan" : "OpenCL",
          teOnCPU  ? "CPU" : "GPU",
-         vaeOnCPU ? "CPU" : "GPU");
+         vaeOnCPU ? "CPU" : "GPU",
+         cfgScale);
 
-    std::unique_ptr<Diffusion> diffusion(Diffusion::createDiffusion(
-            sModelPath,
-            FLUX2_KLEIN_DIFFUSION,
-            gpuFwdType,
-            /*memoryMode=*/0,
-            width, height,
-            teOnCPU,
-            vaeOnCPU,
-            GPU_MEMORY_AUTO,
-            PRECISION_AUTO,
-            CFG_MODE_AUTO,
-            /*numThreads=*/8));
+    try {
+        std::unique_ptr<Diffusion> diffusion(Diffusion::createDiffusion(
+                sModelPath,
+                FLUX2_KLEIN_DIFFUSION,
+                gpuFwdType,
+                /*memoryMode=*/0,
+                width, height,
+                teOnCPU,
+                vaeOnCPU,
+                GPU_MEMORY_AUTO,
+                PRECISION_AUTO,
+                CFG_MODE_AUTO,
+                /*numThreads=*/8));
 
-    if (!diffusion) {
-        LOGE("Failed to create Diffusion instance");
+        if (!diffusion) {
+            LOGE("Failed to create Diffusion instance");
+            return JNI_FALSE;
+        }
+
+        LOGI("Loading model from %s ...", sModelPath.c_str());
+        if (!diffusion->load()) {
+            LOGE("Failed to load model");
+            return JNI_FALSE;
+        }
+
+        LOGI("Running inference...");
+        bool success = diffusion->run(sPrompt, sOutPath, steps, seed,
+                                      cfgScale,
+                                      progressCallback, sImagePath);
+
+        LOGI("Inference %s", success ? "succeeded" : "FAILED");
+        return success ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& e) {
+        LOGE("Fatal native exception caught in JNI: %s", e.what());
+        return JNI_FALSE;
+    } catch (...) {
+        LOGE("Unknown native exception caught in JNI");
         return JNI_FALSE;
     }
-
-    LOGI("Loading model from %s ...", sModelPath.c_str());
-    if (!diffusion->load()) {
-        LOGE("Failed to load model");
-        return JNI_FALSE;
-    }
-
-    LOGI("Running inference...");
-    bool success = diffusion->run(sPrompt, sOutPath, steps, seed,
-                                  /*cfgScale=*/1.0f,
-                                  progressCallback, sImagePath);
-
-    LOGI("Inference %s", success ? "succeeded" : "FAILED");
-    return success ? JNI_TRUE : JNI_FALSE;
 }

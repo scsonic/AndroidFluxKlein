@@ -48,6 +48,7 @@ public class FluxKlein {
                 config.gpuBackend,
                 config.textEncoderOnCPU,
                 config.vaeOnCPU,
+                config.cfgScale,
                 listener
         );
     }
@@ -68,6 +69,7 @@ public class FluxKlein {
             int gpuBackend,
             boolean textEncoderOnCPU,
             boolean vaeOnCPU,
+            float cfgScale,
             ProgressListener listener
     );
 }

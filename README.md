@@ -2,6 +2,39 @@
 
 An Android library and demo app for running **FLUX.2-Klein** image generation on-device via [MNN](https://github.com/alibaba/MNN).
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="screenshot/screen4.png" width="240"/><br/>
+      <b>Settings</b><br/>
+      Prompt · seed (auto/manual) · output size · guidance scale (CFG) · GPU backend (Vulkan / OpenCL) · reference image
+    </td>
+    <td align="center">
+      <img src="screenshot/screen3.png" width="240"/><br/>
+      <b>Result</b><br/>
+      Side-by-side comparison: reference image (left) vs. generated output (right), with per-stage timing (TextEncoder / UNet / VAE)
+    </td>
+  </tr>
+</table>
+
+## Generated Image Examples
+
+### Single Image Outputs
+Here are some examples of images generated on-device:
+
+| Example 1 | Example 2 | Example 3 |
+| :---: | :---: | :---: |
+| <img src="screenshot/FluxKlein_20260608_092913.jpg" width="220"/><br/>`FluxKlein_20260608_092913` | <img src="screenshot/FluxKlein_20260608_093647.jpg" width="220"/><br/>`FluxKlein_20260608_093647` | <img src="screenshot/FluxKlein_20260609_041654.jpg" width="220"/><br/>`FluxKlein_20260609_041654` |
+
+### Side-by-Side Comparisons (Image-to-Image / Prompt guided)
+These comparisons showcase the input reference image (left) compared to the generated output (right):
+
+| Comparison 1 | Comparison 2 |
+| :---: | :---: |
+| <img src="screenshot/FluxKlein_20260609_041654_comparison.jpg" width="350"/><br/>`FluxKlein_20260609_041654_comparison` | <img src="screenshot/FluxKlein_20260608_091333_comparison.jpg" width="350"/><br/>`FluxKlein_20260608_091333_comparison` |
+
 ## Project Structure
 
 ```

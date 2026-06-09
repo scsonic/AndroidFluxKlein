@@ -1,13 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">FLUX.2-Klein Generator</string>
+    <string name="app_name">Klein Image Edit</string>
     <string name="label_prompt">Prompt</string>
     <string name="hint_prompt">Describe the image you want to generate…</string>
     <string name="btn_history">History ▾</string>
-    <string name="label_seed">Random Seed (optional — empty = random)</string>
+    <string name="label_seed">Random Seed</string>
+    <string name="cb_auto_seed">Auto</string>
     <string name="hint_seed">e.g. 42</string>
     <string name="btn_random">Random</string>
     <string name="label_size">Output Image Size</string>
+    <string name="label_cfg_scale">Guidance Scale (CFG)</string>
+    <string name="label_gpu_backend">GPU Backend (UNet)</string>
+    <string name="gpu_vulkan">Vulkan (default)</string>
+    <string name="gpu_opencl">OpenCL (experimental ⚠️)</string>
+    <string name="gpu_opencl_warn_title">OpenCL 風險警告</string>
+    <string name="gpu_opencl_warn_msg">OpenCL 在此裝置上已知會造成 app crash（OOM，虛擬記憶體暴增至 ~28 GB）。\n\n建議繼續使用 Vulkan。\n\n確定要切換到 OpenCL 嗎？</string>
+    <string name="gpu_opencl_warn_confirm">我了解風險，繼續</string>
+    <string name="gpu_opencl_warn_cancel">取消，回到 Vulkan</string>
     <string name="btn_presets">Presets ▾</string>
     <string name="label_ref_image">Reference Image (optional)</string>
     <string name="select_image">Select Reference Image</string>

@@ -9,7 +9,9 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.MediaScannerConnection;
@@ -24,10 +26,15 @@ import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.RadioGroup;
+import android.widget.SeekBar;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -44,6 +51,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.textfield.TextInputEditText;
 import com.scsonic.fluxklein.FluxKlein;
 import com.scsonic.fluxklein.FluxKleinConfig;
@@ -98,6 +106,7 @@ public class MainActivity extends AppCompatActivity {
     private ScrollView        scrollView;
     private TextInputEditText etPrompt;
     private MaterialButton    btnPromptHistory;
+    private MaterialCheckBox  cbAutoSeed;
     private TextInputEditText etSeed;
     private MaterialButton    btnRandomSeed;
     private TextInputEditText etWidth;
@@ -116,8 +125,9 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout      layoutResult;
     private ImageView         ivResult;
     private TextView          tvResultTiming;
-
-    // All backends fixed to CPU — Vulkan/OpenCL cause OOM crashes on device
+    private TextInputEditText etCfgScale;
+    private SeekBar           seekCfgScale;
+    private RadioGroup        rgGpuBackend;
 
     // ── State ─────────────────────────────────────────────────────────────────
     private String  inputImagePath = "";
@@ -169,6 +179,7 @@ public class MainActivity extends AppCompatActivity {
         scrollView         = findViewById(R.id.scrollView);
         etPrompt         = findViewById(R.id.etPrompt);
         btnPromptHistory = findViewById(R.id.btnPromptHistory);
+        cbAutoSeed       = findViewById(R.id.cbAutoSeed);
         etSeed           = findViewById(R.id.etSeed);
         btnRandomSeed    = findViewById(R.id.btnRandomSeed);
         etWidth          = findViewById(R.id.etWidth);
@@ -187,11 +198,16 @@ public class MainActivity extends AppCompatActivity {
         layoutResult     = findViewById(R.id.layoutResult);
         ivResult         = findViewById(R.id.ivResult);
         tvResultTiming   = findViewById(R.id.tvResultTiming);
+        etCfgScale       = findViewById(R.id.etCfgScale);
+        seekCfgScale     = findViewById(R.id.seekCfgScale);
+        rgGpuBackend     = findViewById(R.id.rgGpuBackend);
     }
 
     private void setupListeners() {
         btnRandomSeed.setOnClickListener(v ->
             etSeed.setText(String.valueOf(new Random().nextInt(Integer.MAX_VALUE))));
+        cbAutoSeed.setOnCheckedChangeListener((btn, checked) -> setSeedRowEnabled(!checked));
+        setSeedRowEnabled(false); // default: Auto checked → row disabled
         btnSelectImage.setOnClickListener(v -> imagePicker.launch("image/*"));
         btnClearImage.setOnClickListener(v  -> clearInputImage());
         btnGenerate.setOnClickListener(v    -> startGeneration());
@@ -201,7 +217,75 @@ public class MainActivity extends AppCompatActivity {
         ivResult.setOnClickListener(v -> {
             if (currentResultBitmap != null) showFullscreenImage(currentResultBitmap);
         });
+        rgGpuBackend.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.rbOpenCL) showOpenCLWarning();
+        });
+        setupCfgScaleSync();
+    }
 
+    // =========================================================================
+    // Guidance scale sync (SeekBar ↔ EditText)
+    // =========================================================================
+
+    private void setupCfgScaleSync() {
+        seekCfgScale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                String formatted = String.format(Locale.US, "%.1f", progress / 10f);
+                String current = etCfgScale.getText() != null ? etCfgScale.getText().toString() : "";
+                if (!formatted.equals(current)) {
+                    etCfgScale.setText(formatted);
+                    etCfgScale.setSelection(formatted.length());
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        etCfgScale.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                try {
+                    float val = Float.parseFloat(s.toString());
+                    val = Math.max(0f, Math.min(5f, val));
+                    int progress = Math.round(val * 10);
+                    if (seekCfgScale.getProgress() != progress) seekCfgScale.setProgress(progress);
+                } catch (NumberFormatException ignored) {}
+            }
+        });
+    }
+
+    private int parseGpuBackend() {
+        return rgGpuBackend.getCheckedRadioButtonId() == R.id.rbVulkan ? 1 : 0;
+    }
+
+    private float parseCfgScale() {
+        try {
+            String s = etCfgScale.getText() != null ? etCfgScale.getText().toString().trim() : "1.0";
+            float v = Float.parseFloat(s);
+            return Math.max(0f, Math.min(5f, v));
+        } catch (NumberFormatException e) { return 1.0f; }
+    }
+
+    // Dismiss keyboard when touching outside any EditText
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+            View focused = getCurrentFocus();
+            if (focused instanceof EditText) {
+                Rect r = new Rect();
+                focused.getGlobalVisibleRect(r);
+                if (!r.contains((int) ev.getRawX(), (int) ev.getRawY())) {
+                    focused.clearFocus();
+                    InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                    imm.hideSoftInputFromWindow(focused.getWindowToken(), 0);
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     // =========================================================================
@@ -413,12 +497,17 @@ public class MainActivity extends AppCompatActivity {
         int seed   = parseSeed();
         int width  = parseDimension(etWidth, 512);
         int height = parseDimension(etHeight, 512);
+        float cfgScale = parseCfgScale();
+        int gpuBackend = parseGpuBackend();
         String outPath = new File(getCacheDir(), "out_" + UUID.randomUUID() + ".jpg").getAbsolutePath();
+        final String capturedInputPath = inputImagePath;
 
         addToHistory(prompt);
 
         String genParams = "size=" + width + "x" + height
             + " seed=" + seed + " steps=4"
+            + String.format(Locale.US, " cfg=%.1f", cfgScale)
+            + " gpu=" + (gpuBackend == 1 ? "Vulkan" : "OpenCL")
             + (inputImagePath.isEmpty() ? "" : " img2img=true")
             + " seq=" + ((width / 16) * (height / 16))
             + " prompt=\"" + prompt.replace("\"", "\\\"") + "\"";
@@ -431,7 +520,8 @@ public class MainActivity extends AppCompatActivity {
 
         FluxKleinConfig config = new FluxKleinConfig.Builder(DEFAULT_MODEL_PATH, prompt)
             .seed(seed).steps(4).imageSize(width, height).inputImagePath(inputImagePath)
-            .gpuBackend(2).textEncoderOnCPU(true).vaeOnCPU(true)
+            .gpuBackend(gpuBackend).textEncoderOnCPU(true).vaeOnCPU(true)
+            .cfgScale(cfgScale)
             .build();
 
         isGenerating = true;
@@ -490,7 +580,7 @@ public class MainActivity extends AppCompatActivity {
                 // Generation finished normally (success or graceful error) — clear sentinel.
                 // If the app crashed before reaching here, sentinel remains for next startup.
                 AppLogger.clearGenSentinel(MainActivity.this);
-                if (ok) showResult(outPath, totalMs);
+                if (ok) showResult(outPath, totalMs, capturedInputPath);
                 else    showError(finalErr != null ? finalErr
                             : "Generation failed.\nEnsure model files exist at:\n"
                             + DEFAULT_MODEL_PATH + "\n\nadb push <model_dir> /sdcard/mnn_flux/model");
@@ -498,7 +588,16 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void setSeedRowEnabled(boolean enabled) {
+        etSeed.setEnabled(enabled);
+        btnRandomSeed.setEnabled(enabled);
+        float alpha = enabled ? 1f : 0.38f;
+        etSeed.setAlpha(alpha);
+        btnRandomSeed.setAlpha(alpha);
+    }
+
     private int parseSeed() {
+        if (cbAutoSeed.isChecked()) return new Random().nextInt(Integer.MAX_VALUE);
         String s = etSeed.getText() != null ? etSeed.getText().toString().trim() : "";
         if (TextUtils.isEmpty(s)) return new Random().nextInt(Integer.MAX_VALUE);
         try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 42; }
@@ -553,7 +652,7 @@ public class MainActivity extends AppCompatActivity {
         tvProgressPhase.setText(sb.toString());
     }
 
-    private void showResult(String outPath, long totalMs) {
+    private void showResult(String outPath, long totalMs, String capturedInputPath) {
         releaseWakeLocks();
         layoutProgress.setVisibility(View.GONE);
         btnGenerate.setEnabled(true);
@@ -565,6 +664,10 @@ public class MainActivity extends AppCompatActivity {
             ivResult.setImageBitmap(currentResultBitmap);
             layoutResult.setVisibility(View.VISIBLE);
             executor.submit(() -> saveToGallery(outPath));
+            if (!capturedInputPath.isEmpty()) {
+                final Bitmap bmpSnap = currentResultBitmap;
+                executor.submit(() -> saveSideBySideToGallery(capturedInputPath, bmpSnap));
+            }
         }
 
         StringBuilder sb = new StringBuilder();
@@ -583,6 +686,21 @@ public class MainActivity extends AppCompatActivity {
         btnGenerate.setText(R.string.generate);
         tvError.setText(msg);
         cardError.setVisibility(View.VISIBLE);
+    }
+
+    // =========================================================================
+    // OpenCL warning dialog
+    // =========================================================================
+
+    private void showOpenCLWarning() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.gpu_opencl_warn_title)
+            .setMessage(R.string.gpu_opencl_warn_msg)
+            .setPositiveButton(R.string.gpu_opencl_warn_confirm, null)
+            .setNegativeButton(R.string.gpu_opencl_warn_cancel, (d, w) ->
+                rgGpuBackend.check(R.id.rbVulkan))
+            .setCancelable(false)
+            .show();
     }
 
     // =========================================================================
@@ -649,8 +767,11 @@ public class MainActivity extends AppCompatActivity {
     // =========================================================================
 
     private void saveToGallery(String srcPath) {
-        String ts  = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-        String fn  = "FluxKlein_" + ts + ".jpg";
+        String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+        saveFile(srcPath, "FluxKlein_" + ts + ".jpg", true);
+    }
+
+    private void saveFile(String srcPath, String fn, boolean showToast) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ContentValues cv = new ContentValues();
@@ -670,7 +791,7 @@ public class MainActivity extends AppCompatActivity {
                     cv.clear();
                     cv.put(MediaStore.Images.Media.IS_PENDING, 0);
                     getContentResolver().update(uri, cv, null, null);
-                    mainHandler.post(() ->
+                    if (showToast) mainHandler.post(() ->
                         Toast.makeText(this, R.string.saved_to_gallery, Toast.LENGTH_SHORT).show());
                 }
             } else {
@@ -684,7 +805,42 @@ public class MainActivity extends AppCompatActivity {
                 }
                 saveToGalleryLegacy(srcPath, fn);
             }
-        } catch (Exception e) { Log.e(TAG, "saveToGallery failed", e); }
+        } catch (Exception e) { Log.e(TAG, "saveFile failed", e); }
+    }
+
+    private void saveSideBySideToGallery(String inputPath, Bitmap output) {
+        Bitmap composite = buildSideBySide(inputPath, output);
+        if (composite == null) return;
+        try {
+            File tmp = new File(getCacheDir(), "compare_" + UUID.randomUUID() + ".jpg");
+            try (FileOutputStream fos = new FileOutputStream(tmp)) {
+                composite.compress(Bitmap.CompressFormat.JPEG, 95, fos);
+            }
+            composite.recycle();
+            String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+            saveFile(tmp.getAbsolutePath(), "FluxKlein_" + ts + "_comparison.jpg", false);
+        } catch (Exception e) {
+            Log.e(TAG, "saveSideBySideToGallery failed", e);
+        }
+    }
+
+    private Bitmap buildSideBySide(String inputPath, Bitmap output) {
+        int W = output.getWidth();
+        int H = output.getHeight();
+        Bitmap rawInput = BitmapFactory.decodeFile(inputPath);
+        if (rawInput == null) return null;
+        float scale = Math.min((float) W / rawInput.getWidth(), (float) H / rawInput.getHeight());
+        int sw = Math.round(rawInput.getWidth() * scale);
+        int sh = Math.round(rawInput.getHeight() * scale);
+        Bitmap scaledInput = Bitmap.createScaledBitmap(rawInput, sw, sh, true);
+        rawInput.recycle();
+        Bitmap composite = Bitmap.createBitmap(W * 2, H, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(composite);
+        canvas.drawColor(Color.BLACK);
+        canvas.drawBitmap(scaledInput, (W - sw) / 2f, (H - sh) / 2f, null);
+        scaledInput.recycle();
+        canvas.drawBitmap(output, (float) W, 0f, null);
+        return composite;
     }
 
     private void saveToGalleryLegacy(String srcPath, String filename) {

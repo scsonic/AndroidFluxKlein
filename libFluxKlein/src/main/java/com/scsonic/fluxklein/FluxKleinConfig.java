@@ -28,6 +28,8 @@ public class FluxKleinConfig {
     public final boolean textEncoderOnCPU;
     /** True = run VAE on CPU; false = run on the selected GPU backend. */
     public final boolean vaeOnCPU;
+    /** Classifier-free guidance scale. 1.0 = no CFG (FLUX default). Range [0, 5]. */
+    public final float cfgScale;
 
     private FluxKleinConfig(Builder b) {
         this.modelPath = b.modelPath;
@@ -40,6 +42,7 @@ public class FluxKleinConfig {
         this.gpuBackend = b.gpuBackend;
         this.textEncoderOnCPU = b.textEncoderOnCPU;
         this.vaeOnCPU = b.vaeOnCPU;
+        this.cfgScale = b.cfgScale;
     }
 
     public static class Builder {
@@ -53,6 +56,7 @@ public class FluxKleinConfig {
         private int gpuBackend = 0;          // 0=OpenCL, 1=Vulkan
         private boolean textEncoderOnCPU = true;
         private boolean vaeOnCPU = true;
+        private float cfgScale = 1.0f;
 
         public Builder(String modelPath, String prompt) {
             if (modelPath == null || modelPath.isEmpty())
@@ -99,6 +103,9 @@ public class FluxKleinConfig {
 
         /** True = VAE on CPU (default); false = VAE on the GPU backend (typically faster). */
         public Builder vaeOnCPU(boolean onCPU) { this.vaeOnCPU = onCPU; return this; }
+
+        /** Classifier-free guidance scale. 1.0 = no CFG (FLUX default). Range [0, 5]. */
+        public Builder cfgScale(float scale) { this.cfgScale = Math.max(0f, Math.min(5f, scale)); return this; }
 
         public FluxKleinConfig build() {
             return new FluxKleinConfig(this);
