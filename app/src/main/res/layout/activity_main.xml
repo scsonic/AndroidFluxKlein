@@ -333,7 +333,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/gpu_vulkan"
-                        android:checked="true"
                         android:textSize="13sp" />
 
                     <RadioButton
@@ -341,6 +340,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/gpu_opencl"
+                        android:checked="true"
                         android:textSize="13sp" />
 
                     <RadioButton

@@ -59,7 +59,7 @@ public class FluxKleinConfig {
         private int imageWidth = 512;
         private int imageHeight = 512;
         private String inputImagePath = "";
-        private int gpuBackend = GPU_BACKEND_OPENCL;
+        private int gpuBackend = GPU_BACKEND_OPENCL; // OpenCL is the confirmed-stable default
         private boolean textEncoderOnCPU = true;
         private boolean vaeOnCPU = true;
         private float cfgScale = 1.0f;

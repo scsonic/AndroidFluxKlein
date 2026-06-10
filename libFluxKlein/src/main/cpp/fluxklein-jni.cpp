@@ -139,19 +139,17 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
 }
 
 // com.scsonic.fluxklein.FluxKlein#checkNpuAvailable() : boolean
-// Tries to dlopen libQnnHtp.so and load the QNN symbol to verify HTP/NPU is accessible.
+// Loads libQnnHtp.so and verifies the QNN HTP interface is present and usable.
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_scsonic_fluxklein_FluxKlein_checkNpuAvailable(
         JNIEnv  * /* env */,
         jclass  /* clazz */)
 {
-    // Try to load the QNN HTP library that MNN's QNN backend will dlopen at runtime.
     void* handle = dlopen("libQnnHtp.so", RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
         LOGI("NPU check: dlopen(libQnnHtp.so) failed: %s", dlerror());
         return JNI_FALSE;
     }
-    // Verify the QNN interface getter is present — if it's there, QNN HTP is functional.
     void* sym = dlsym(handle, "QnnInterface_getProviders");
     if (!sym) {
         LOGI("NPU check: QnnInterface_getProviders not found: %s", dlerror());
@@ -159,6 +157,6 @@ Java_com_scsonic_fluxklein_FluxKlein_checkNpuAvailable(
         return JNI_FALSE;
     }
     dlclose(handle);
-    LOGI("NPU check: libQnnHtp.so loaded successfully — HTP/NPU is available");
+    LOGI("NPU check: libQnnHtp.so OK — QNN HTP backend available");
     return JNI_TRUE;
 }
