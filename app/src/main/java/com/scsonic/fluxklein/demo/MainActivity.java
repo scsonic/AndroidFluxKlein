@@ -33,6 +33,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.ArrayAdapter;
@@ -129,6 +130,7 @@ public class MainActivity extends AppCompatActivity {
     private TextInputEditText etCfgScale;
     private SeekBar           seekCfgScale;
     private RadioGroup        rgGpuBackend;
+    private RadioButton       rbNpu;
 
     // ── State ─────────────────────────────────────────────────────────────────
     private String  inputImagePath = "";
@@ -163,6 +165,7 @@ public class MainActivity extends AppCompatActivity {
         loadHistory();
         requestStoragePermission();
         checkPendingCrash();
+        checkNpuAndUpdateUi();
     }
 
     @Override
@@ -204,6 +207,7 @@ public class MainActivity extends AppCompatActivity {
         etCfgScale       = findViewById(R.id.etCfgScale);
         seekCfgScale     = findViewById(R.id.seekCfgScale);
         rgGpuBackend     = findViewById(R.id.rgGpuBackend);
+        rbNpu            = findViewById(R.id.rbNpu);
     }
 
     private void setupListeners() {
@@ -260,7 +264,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private int parseGpuBackend() {
-        return rgGpuBackend.getCheckedRadioButtonId() == R.id.rbVulkan ? 1 : 0;
+        int id = rgGpuBackend.getCheckedRadioButtonId();
+        if (id == R.id.rbVulkan) return FluxKleinConfig.GPU_BACKEND_VULKAN;
+        if (id == R.id.rbNpu)    return FluxKleinConfig.GPU_BACKEND_NPU;
+        return FluxKleinConfig.GPU_BACKEND_OPENCL;
+    }
+
+    private void checkNpuAndUpdateUi() {
+        executor.submit(() -> {
+            boolean available = false;
+            try {
+                available = FluxKlein.checkNpuAvailable();
+                Log.i(TAG, "NPU check: HTP/QNN available=" + available);
+                AppLogger.log(this, "NPU", "HTP/QNN available: " + available);
+            } catch (Throwable t) {
+                Log.e(TAG, "NPU check exception: " + t);
+                AppLogger.log(this, "NPU", "check failed: " + t);
+            }
+            final boolean npuAvailable = available;
+            mainHandler.post(() -> {
+                rbNpu.setEnabled(npuAvailable);
+                rbNpu.setText(getString(R.string.gpu_npu)
+                    + (npuAvailable ? "" : " (unavailable)"));
+            });
+        });
     }
 
     private float parseCfgScale() {
@@ -505,10 +532,14 @@ public class MainActivity extends AppCompatActivity {
 
         addToHistory(prompt);
 
+        String gpuName = (gpuBackend == FluxKleinConfig.GPU_BACKEND_VULKAN) ? "Vulkan"
+                       : (gpuBackend == FluxKleinConfig.GPU_BACKEND_NPU)    ? "NPU(QNN)"
+                       : (gpuBackend == FluxKleinConfig.GPU_BACKEND_CPU)    ? "CPU"
+                       : "OpenCL";
         String genParams = "size=" + width + "x" + height
             + " seed=" + seed + " steps=4"
             + String.format(Locale.US, " cfg=%.1f", cfgScale)
-            + " gpu=" + (gpuBackend == 1 ? "Vulkan" : "OpenCL")
+            + " gpu=" + gpuName
             + (inputImagePath.isEmpty() ? "" : " img2img=true")
             + " seq=" + ((width / 16) * (height / 16))
             + " prompt=\"" + prompt.replace("\"", "\\\"") + "\"";

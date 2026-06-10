@@ -22,7 +22,13 @@ public class FluxKleinConfig {
     public final int imageHeight;
     /** Empty string means no reference image (text-to-image). */
     public final String inputImagePath;
-    /** GPU backend for the UNet (and any GPU-assigned components). 0=OpenCL, 1=Vulkan. */
+    /** GPU backend constants for {@link #gpuBackend}. */
+    public static final int GPU_BACKEND_OPENCL = 0;
+    public static final int GPU_BACKEND_VULKAN  = 1;
+    public static final int GPU_BACKEND_CPU     = 2;
+    public static final int GPU_BACKEND_NPU     = 3; // Qualcomm HTP/NPU via QNN (MNN_FORWARD_NN)
+
+    /** GPU backend for the UNet (and any GPU-assigned components). See GPU_BACKEND_* constants. */
     public final int gpuBackend;
     /** True = run text encoder on CPU; false = run on the selected GPU backend. */
     public final boolean textEncoderOnCPU;
@@ -53,7 +59,7 @@ public class FluxKleinConfig {
         private int imageWidth = 512;
         private int imageHeight = 512;
         private String inputImagePath = "";
-        private int gpuBackend = 0;          // 0=OpenCL, 1=Vulkan
+        private int gpuBackend = GPU_BACKEND_OPENCL;
         private boolean textEncoderOnCPU = true;
         private boolean vaeOnCPU = true;
         private float cfgScale = 1.0f;
@@ -95,7 +101,7 @@ public class FluxKleinConfig {
             return this;
         }
 
-        /** GPU backend: 0=OpenCL (default), 1=Vulkan. Applies to UNet and any GPU-assigned modules. */
+        /** GPU backend: see GPU_BACKEND_* constants. Applies to UNet and any GPU-assigned modules. */
         public Builder gpuBackend(int backend) { this.gpuBackend = backend; return this; }
 
         /** True = text encoder on CPU (safer, default); false = text encoder on the GPU backend. */
@@ -120,7 +126,10 @@ public class FluxKleinConfig {
                 ", steps=" + steps +
                 ", size=" + imageWidth + "x" + imageHeight +
                 ", inputImage='" + (inputImagePath.isEmpty() ? "none" : inputImagePath) + '\'' +
-                ", gpu=" + (gpuBackend == 1 ? "Vulkan" : "OpenCL") +
+                ", gpu=" + (gpuBackend == GPU_BACKEND_VULKAN ? "Vulkan"
+                         : gpuBackend == GPU_BACKEND_CPU    ? "CPU"
+                         : gpuBackend == GPU_BACKEND_NPU    ? "NPU(QNN)"
+                         : "OpenCL") +
                 ", te=" + (textEncoderOnCPU ? "CPU" : "GPU") +
                 ", vae=" + (vaeOnCPU ? "CPU" : "GPU") +
                 '}';

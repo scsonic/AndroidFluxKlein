@@ -11,9 +11,10 @@
     <string name="btn_random">Random</string>
     <string name="label_size">Output Image Size</string>
     <string name="label_cfg_scale">Guidance Scale (CFG)</string>
-    <string name="label_gpu_backend">GPU Backend (UNet)</string>
+    <string name="label_gpu_backend">Backend (UNet)</string>
     <string name="gpu_vulkan">Vulkan (default)</string>
     <string name="gpu_opencl">OpenCL (experimental ⚠️)</string>
+    <string name="gpu_npu">NPU/HTP (QNN)</string>
     <string name="btn_presets">Presets ▾</string>
     <string name="label_ref_image">Reference Image (optional)</string>
     <string name="select_image">Select Reference Image</string>

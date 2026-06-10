@@ -326,7 +326,7 @@
                     android:id="@+id/rgGpuBackend"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
+                    android:orientation="vertical">
 
                     <RadioButton
                         android:id="@+id/rbVulkan"
@@ -334,8 +334,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/gpu_vulkan"
                         android:checked="true"
-                        android:textSize="13sp"
-                        android:layout_marginEnd="16dp" />
+                        android:textSize="13sp" />
 
                     <RadioButton
                         android:id="@+id/rbOpenCL"
@@ -343,6 +342,14 @@
                         android:layout_height="wrap_content"
                         android:text="@string/gpu_opencl"
                         android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rbNpu"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/gpu_npu"
+                        android:textSize="13sp"
+                        android:enabled="false" />
                 </RadioGroup>
 
             </LinearLayout>

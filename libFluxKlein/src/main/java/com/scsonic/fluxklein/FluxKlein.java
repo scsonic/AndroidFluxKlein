@@ -53,6 +53,12 @@ public class FluxKlein {
         );
     }
 
+    /**
+     * Check if Qualcomm HTP/NPU backend is available on this device.
+     * Call once at startup (cheap dlopen test). Safe to call on main thread.
+     */
+    public static native boolean checkNpuAvailable();
+
     // ------------------------------------------------------------------
     // JNI bridge — implemented in fluxklein-jni.cpp
     // ------------------------------------------------------------------

@@ -1,5 +1,6 @@
 #include "diffusion/diffusion.hpp"
 #include <android/log.h>
+#include <dlfcn.h>
 #include <jni.h>
 #include <memory>
 #include <string>
@@ -60,10 +61,11 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
     int height = static_cast<int>(jHeight);
     if (seed == -1) seed = 42; // fallback; caller should randomise before passing
 
-    // gpuBackend: 0=OpenCL, 1=Vulkan, 2=CPU
+    // gpuBackend: 0=OpenCL, 1=Vulkan, 2=CPU, 3=QNN/NPU (MNN_FORWARD_NN)
     MNNForwardType gpuFwdType;
     if      (jGpuBackend == 1) gpuFwdType = MNN_FORWARD_VULKAN;
     else if (jGpuBackend == 2) gpuFwdType = MNN_FORWARD_CPU;
+    else if (jGpuBackend == 3) gpuFwdType = MNN_FORWARD_NN;
     else                       gpuFwdType = MNN_FORWARD_OPENCL;
     bool teOnCPU  = (jTextEncoderOnCPU  == JNI_TRUE);
     bool vaeOnCPU = (jVaeOnCPU == JNI_TRUE);
@@ -84,9 +86,13 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
     };
 
     // ---- Create and run Diffusion ----
+    const char* gpuName = (jGpuBackend == 1) ? "Vulkan"
+                        : (jGpuBackend == 2) ? "CPU"
+                        : (jGpuBackend == 3) ? "NPU(QNN)"
+                        : "OpenCL";
     LOGI("Creating diffusion: size=%dx%d steps=%d seed=%d gpu=%s te=%s vae=%s cfg=%.1f",
          width, height, steps, seed,
-         jGpuBackend == 1 ? "Vulkan" : "OpenCL",
+         gpuName,
          teOnCPU  ? "CPU" : "GPU",
          vaeOnCPU ? "CPU" : "GPU",
          cfgScale);
@@ -130,4 +136,29 @@ Java_com_scsonic_fluxklein_FluxKlein_nativeGenerate(
         LOGE("Unknown native exception caught in JNI");
         return JNI_FALSE;
     }
+}
+
+// com.scsonic.fluxklein.FluxKlein#checkNpuAvailable() : boolean
+// Tries to dlopen libQnnHtp.so and load the QNN symbol to verify HTP/NPU is accessible.
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_scsonic_fluxklein_FluxKlein_checkNpuAvailable(
+        JNIEnv  * /* env */,
+        jclass  /* clazz */)
+{
+    // Try to load the QNN HTP library that MNN's QNN backend will dlopen at runtime.
+    void* handle = dlopen("libQnnHtp.so", RTLD_NOW | RTLD_LOCAL);
+    if (!handle) {
+        LOGI("NPU check: dlopen(libQnnHtp.so) failed: %s", dlerror());
+        return JNI_FALSE;
+    }
+    // Verify the QNN interface getter is present — if it's there, QNN HTP is functional.
+    void* sym = dlsym(handle, "QnnInterface_getProviders");
+    if (!sym) {
+        LOGI("NPU check: QnnInterface_getProviders not found: %s", dlerror());
+        dlclose(handle);
+        return JNI_FALSE;
+    }
+    dlclose(handle);
+    LOGI("NPU check: libQnnHtp.so loaded successfully — HTP/NPU is available");
+    return JNI_TRUE;
 }
