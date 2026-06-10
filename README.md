@@ -1,6 +1,6 @@
 # AndroidFluxKlein
 
-An Android library and demo app for running **FLUX.2-Klein** image generation on-device via [MNN](https://github.com/alibaba/MNN).
+An Android library and demo app for running **FLUX.2-Klein 4B** image generation on-device via [forked MNN](https://github.com/scsonic/MNN).
 
 ## Screenshots
 
@@ -8,13 +8,9 @@ An Android library and demo app for running **FLUX.2-Klein** image generation on
   <tr>
     <td align="center">
       <img src="screenshot/screen4.png" width="240"/><br/>
-      <b>Settings</b><br/>
-      Prompt · seed (auto/manual) · output size · guidance scale (CFG) · GPU backend (Vulkan / OpenCL) · reference image
     </td>
     <td align="center">
       <img src="screenshot/screen3.png" width="240"/><br/>
-      <b>Result</b><br/>
-      Side-by-side comparison: reference image (left) vs. generated output (right), with per-stage timing (TextEncoder / UNet / VAE)
     </td>
   </tr>
 </table>
